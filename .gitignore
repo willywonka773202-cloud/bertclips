@@ -1,0 +1,8 @@
+node_modules
+.next
+.next-prod
+.env
+.env.local
+.bertos-runtime
+*.log
+.DS_Store
