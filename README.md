@@ -35,7 +35,20 @@ campaigns, game promos, and factory bridge are all fully active. To bring resear
 VPS later, port `lib/providers` + `lib/chat/council` + `lib/memory` from bert-ai and
 restore the real implementation — the export surface already matches.
 
-## Run it on a VPS
+## Quick start on a VPS (one command)
+
+On a fresh Ubuntu droplet, as root (the DigitalOcean droplet Console logs in as root):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/willywonka773202-cloud/bertclips/main/scripts/setup-vps.sh | bash
+```
+
+That installs the engine (ffmpeg + yt-dlp + faster-whisper) and Node, clones + builds
+the app, installs a `bertclips` systemd service, starts it on port 3210, and kicks the
+24/7 heartbeat. It is idempotent — re-run it to update. The manual steps below are the
+same thing broken out if you'd rather do it by hand.
+
+## Run it on a VPS (manual)
 
 ### 1. System dependencies (the free engine)
 
