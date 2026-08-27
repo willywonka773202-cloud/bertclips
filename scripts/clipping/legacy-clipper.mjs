@@ -255,7 +255,7 @@ for (let index = 0; index < windows.length; index++) {
     "-ss", String(window.start), "-i", source, "-t", String(clipDuration),
     "-vf", videoFilter,
     "-af", "acompressor=threshold=-18dB:ratio=3:attack=5:release=120,loudnorm=I=-14:TP=-1.5:LRA=11",
-    "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+    "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p",
     "-profile:v", "high", "-level", "4.2", "-r", "60", "-g", "120", "-maxrate", "8M", "-bufsize", "12M",
     "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", "-y", output,
   ], { cwd: workDir, timeout: 15 * 60 * 1000 });

@@ -362,7 +362,7 @@ async function renderClip(
       "-c:v",
       "libx264",
       "-preset",
-      "medium",
+      "fast",
       "-crf",
       "18",
       "-pix_fmt",
