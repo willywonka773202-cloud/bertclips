@@ -235,7 +235,7 @@ async function download(url: string, workDir: string, jobId: string, signal?: Ab
 
 /** Transcribe with faster-whisper; parse the single JSON document from stdout. */
 async function transcribe(videoPath: string, signal?: AbortSignal): Promise<Transcript | null> {
-  const r = await run(pythonBin(), [transcribeScriptPath(), videoPath, "base"], {
+  const r = await run(pythonBin(), [transcribeScriptPath(), videoPath, "small.en"], {
     timeoutMs: 20 * 60 * 1000,
     signal,
   });

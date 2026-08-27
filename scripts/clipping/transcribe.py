@@ -8,7 +8,7 @@ JSON on stdout: language, duration, phrase-level segments, and word-level timing
 so stdout is a single clean JSON document the Node engine parses.
 
 Usage: python transcribe.py <input_path> [model_size]
-  model_size defaults to "base" (a good speed/accuracy tradeoff on CPU).
+  model_size defaults to "small.en" for more reliable English captions on noisy clips.
 """
 
 import json
@@ -21,7 +21,7 @@ def main() -> int:
         return 2
 
     input_path = sys.argv[1]
-    model_size = sys.argv[2] if len(sys.argv) > 2 else "base"
+    model_size = sys.argv[2] if len(sys.argv) > 2 else "small.en"
 
     try:
         from faster_whisper import WhisperModel

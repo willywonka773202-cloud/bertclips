@@ -86,7 +86,7 @@ function dimensionsOf(file) {
 }
 
 function transcribe(file) {
-  const result = run(python, [transcribeScript, file, process.env.CLIPPING_WHISPER_MODEL || "base"], {
+  const result = run(python, [transcribeScript, file, process.env.CLIPPING_WHISPER_MODEL || "small.en"], {
     timeout: 30 * 60 * 1000,
   });
   const transcript = lastJson(result.stdout);
@@ -217,7 +217,10 @@ function buildAss(words, start, end) {
 
 function cropFilter(info, dims) {
   if (fullMode) {
-    return "split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,gblur=sigma=28[blur];[fg]scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos[front];[blur][front]overlay=(W-w)/2:(H-h)/2";
+    // Blur a quarter-size backdrop and upscale it behind the sharp foreground.
+    // It looks the same at full output size but avoids an expensive 1080x1920
+    // Gaussian blur on every frame of a 60 fps clip.
+    return "split=2[bg][fg];[bg]scale=270:480:force_original_aspect_ratio=increase:flags=bilinear,crop=270:480,gblur=sigma=10,scale=1080:1920:flags=bilinear[blur];[fg]scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos[front];[blur][front]overlay=(W-w)/2:(H-h)/2";
   }
   let cropWidth = Math.round(dims.height * 9 / 16);
   if (cropWidth % 2) cropWidth += 1;
