@@ -225,4 +225,13 @@ for (let index = 0; index < windows.length; index++) {
 }
 
 console.log(`rendered ${rendered}/${windows.length} clip(s)`);
+// The parent generator has everything it needs in outDir once this process exits.
+// Source downloads are much larger than final clips, so never leave them behind on
+// the small production droplet. Also discard generated subtitle scratch files.
+try { fs.rmSync(source, { force: true }); } catch {}
+try {
+  for (const file of fs.readdirSync(workDir)) {
+    if (file.endsWith(".ass")) fs.rmSync(path.join(workDir, file), { force: true });
+  }
+} catch {}
 process.exit(rendered > 0 ? 0 : 5);
