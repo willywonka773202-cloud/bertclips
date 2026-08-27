@@ -156,32 +156,68 @@ function buildAss(words, start, end) {
     "[Script Info]", "ScriptType: v4.00+", "PlayResX: 1080", "PlayResY: 1920", "WrapStyle: 0", "ScaledBorderAndShadow: yes", "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    "Style: Cap,Poppins ExtraBold,112,&H00FFFFFF,&H00FFFFFF,&H00000000,&HA0000000,0,0,0,0,100,100,0,0,1,8,3,5,90,90,60,1", "",
+    "Style: Cap,Poppins ExtraBold,76,&H00FFFFFF,&H00FFFFFF,&H00000000,&H70000000,-1,0,0,0,100,100,0,0,1,6,2,5,110,110,60,1", "",
     "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
   ];
-  const activeWords = (words || [])
+  const visibleWords = (words || [])
     .filter((word) => word.start >= start - 0.05 && word.start < end)
     .map((word) => ({ ...word, word: cleanToken(word.word) }))
     .filter((word) => /[0-9A-Za-z]/.test(word.word));
-  for (let index = 0; index < activeWords.length; index++) {
-    const current = activeWords[index];
-    const next = activeWords[index + 1];
-    const eventStart = Math.max(0, current.start - start);
-    const eventEnd = Math.min(end - start, next ? next.start - start : current.end - start + 0.3);
+
+  // Stable phrase cards replace the old per-word karaoke flash. A phrase stays up
+  // long enough to read, uses at most two compact lines, and highlights only one
+  // meaningful word. This is calmer, smaller, and leaves the video unobstructed.
+  const chunks = [];
+  let chunk = [];
+  for (const word of visibleWords) {
+    chunk.push(word);
+    const phraseAge = word.end - chunk[0].start;
+    if (chunk.length >= 5 || phraseAge >= 2.4 || /[.!?]$/.test(word.word)) {
+      chunks.push(chunk); chunk = [];
+    }
+  }
+  if (chunk.length) {
+    if (chunk.length < 3 && chunks.length && chunks[chunks.length - 1].length + chunk.length <= 7) chunks[chunks.length - 1].push(...chunk);
+    else chunks.push(chunk);
+  }
+
+  const emphasis = /^(never|always|best|worst|crazy|insane|truth|mistake|money|million|win|lose|hate|love|why|how|actually|problem|changed|risk|believe|secret|leak|leaks)$/i;
+  const filler = /^(a|an|and|are|as|at|be|been|but|by|for|from|had|has|have|he|her|hers|him|his|i|if|in|is|it|its|me|my|of|on|or|our|ours|she|so|that|that's|the|their|theirs|them|then|there|these|they|this|those|to|was|we|were|what|when|where|which|who|with|you|your|yours)$/i;
+  for (let index = 0; index < chunks.length; index++) {
+    const wordsInChunk = chunks[index];
+    const next = chunks[index + 1];
+    const eventStart = Math.max(0, wordsInChunk[0].start - start);
+    const eventEnd = Math.min(end - start, next ? next[0].start - start : wordsInChunk[wordsInChunk.length - 1].end - start + 0.35);
     if (eventEnd <= eventStart) continue;
-    const groupStart = index - (index % 3);
-    const text = activeWords.slice(groupStart, groupStart + 3).map((word, groupIndex) => {
-      const token = word.word.replace(/[{}\\]/g, "").toUpperCase();
-      return groupIndex === index - groupStart ? `{\\c&H00E0FF&}${token}{\\c&HFFFFFF&}` : token;
-    }).join(" ");
-    header.push(`Dialogue: 1,${assTime(eventStart)},${assTime(eventEnd)},Cap,,0,0,0,,{\\an5\\pos(540,1267)}${text}`);
+
+    let accentIndex = wordsInChunk.findIndex((word) => emphasis.test(word.word.replace(/[^0-9A-Za-z]/g, "")));
+    if (accentIndex < 0) {
+      const candidates = wordsInChunk
+        .map((word, wordIndex) => ({ wordIndex, token: word.word.replace(/[^0-9A-Za-z']/g, "") }))
+        .filter(({ token }) => token.length >= 4 && !filler.test(token));
+      accentIndex = candidates.length
+        ? candidates.reduce((best, item) => item.token.length > best.token.length ? item : best).wordIndex
+        : -1;
+    }
+    const rendered = wordsInChunk.map((word, wordIndex) => {
+      let token = word.word.replace(/[{}\\]/g, "");
+      if (wordIndex === 0) token = token.charAt(0).toUpperCase() + token.slice(1);
+      return wordIndex === accentIndex ? `{\\c&H00D7FF&}${token}{\\c&HFFFFFF&}` : token;
+    });
+    const charTotal = rendered.reduce((total, token) => total + token.replace(/{[^}]+}/g, "").length, 0) + rendered.length - 1;
+    if (rendered.length >= 4 && charTotal > 19) {
+      const split = Math.ceil(rendered.length / 2);
+      rendered.splice(split, 0, "\\N");
+    }
+    const text = rendered.join(" ").replace(/ \\N /g, "\\N");
+    header.push(`Dialogue: 1,${assTime(eventStart)},${assTime(eventEnd)},Cap,,0,0,0,,{\\an5\\pos(540,1375)\\fad(80,80)}${text}`);
   }
   return `${header.join("\n")}\n`;
 }
 
 function cropFilter(info, dims) {
   if (fullMode) {
-    return "split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,gblur=sigma=28[blur];[fg]scale=1080:1920:force_original_aspect_ratio=decrease[front];[blur][front]overlay=(W-w)/2:(H-h)/2";
+    return "split=2[bg][fg];[bg]scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,gblur=sigma=28[blur];[fg]scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos[front];[blur][front]overlay=(W-w)/2:(H-h)/2";
   }
   let cropWidth = Math.round(dims.height * 9 / 16);
   if (cropWidth % 2) cropWidth += 1;
@@ -201,6 +237,11 @@ const duration = Number(transcript.duration) || durationOf(source);
 const windows = chooseWindows(transcript, duration);
 const dims = dimensionsOf(source);
 let rendered = 0;
+try {
+  const fontsDir = path.join(workDir, "fonts");
+  fs.mkdirSync(fontsDir, { recursive: true });
+  fs.copyFileSync(path.join(HERE, "fonts", "Poppins-ExtraBold.ttf"), path.join(fontsDir, "Poppins-ExtraBold.ttf"));
+} catch {}
 
 for (let index = 0; index < windows.length; index++) {
   const window = windows[index];
@@ -209,12 +250,12 @@ for (let index = 0; index < windows.length; index++) {
   const assName = `v2_clip_${index}.ass`;
   fs.writeFileSync(path.join(workDir, assName), buildAss(transcript.words, window.start, window.end));
   const output = path.join(outDir, `v2_clip_${index}.mp4`);
-  const videoFilter = `${cropFilter(info, dims)},ass=${assName}`;
+  const videoFilter = `${cropFilter(info, dims)},ass=${assName}:fontsdir=fonts`;
   const result = run(ffmpeg, [
     "-ss", String(window.start), "-i", source, "-t", String(clipDuration),
     "-vf", videoFilter,
     "-af", "acompressor=threshold=-18dB:ratio=3:attack=5:release=120,loudnorm=I=-14:TP=-1.5:LRA=11",
-    "-c:v", "libx264", "-preset", "veryfast", "-crf", "19", "-pix_fmt", "yuv420p",
+    "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
     "-profile:v", "high", "-level", "4.2", "-r", "60", "-g", "120", "-maxrate", "8M", "-bufsize", "12M",
     "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", "-y", output,
   ], { cwd: workDir, timeout: 15 * 60 * 1000 });
@@ -234,4 +275,5 @@ try {
     if (file.endsWith(".ass")) fs.rmSync(path.join(workDir, file), { force: true });
   }
 } catch {}
+try { fs.rmSync(path.join(workDir, "fonts"), { recursive: true, force: true }); } catch {}
 process.exit(rendered > 0 ? 0 : 5);
