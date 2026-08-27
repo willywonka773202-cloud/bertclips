@@ -52,6 +52,7 @@ def main() -> int:
             print(json.dumps({"centerX": None, "error": "cannot open video"}))
             return 0
         centers = []
+        widths = []
         for i in range(samples):
             t = start + dur * ((i + 0.5) / samples)
             cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
@@ -70,14 +71,17 @@ def main() -> int:
             best = max(faces, key=lambda f: float(f[14]))
             cx = (float(best[0]) + float(best[2]) / 2.0) / float(sw)
             centers.append(min(1.0, max(0.0, cx)))
+            widths.append(min(1.0, max(0.0, float(best[2]) / float(sw))))
         cap.release()
 
         if len(centers) < max(2, samples // 5):
             print(json.dumps({"centerX": None, "found": len(centers), "sampled": samples}))
             return 0
         centers.sort()
+        widths.sort()
         med = centers[len(centers) // 2]
-        print(json.dumps({"centerX": round(med, 4), "found": len(centers), "sampled": samples}))
+        med_width = widths[len(widths) // 2]
+        print(json.dumps({"centerX": round(med, 4), "faceWidth": round(med_width, 4), "found": len(centers), "sampled": samples}))
         return 0
     except Exception as exc:  # noqa: BLE001
         print(json.dumps({"centerX": None, "error": f"facecrop failed: {exc}"}))
