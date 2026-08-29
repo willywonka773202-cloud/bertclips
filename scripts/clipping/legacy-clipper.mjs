@@ -156,7 +156,7 @@ function buildAss(words, start, end) {
     "[Script Info]", "ScriptType: v4.00+", "PlayResX: 1080", "PlayResY: 1920", "WrapStyle: 0", "ScaledBorderAndShadow: yes", "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    "Style: Cap,Poppins ExtraBold,76,&H00FFFFFF,&H00FFFFFF,&H00000000,&H70000000,-1,0,0,0,100,100,0,0,1,6,2,5,110,110,60,1", "",
+    "Style: Cap,Poppins ExtraBold,72,&H00F7F7F7,&H00F7F7F7,&H00120C08,&H68000000,-1,0,0,0,100,100,0,0,1,4,1,5,120,120,60,1", "",
     "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
   ];
   const visibleWords = (words || [])
@@ -181,8 +181,6 @@ function buildAss(words, start, end) {
     else chunks.push(chunk);
   }
 
-  const emphasis = /^(never|always|best|worst|crazy|insane|truth|mistake|money|million|win|lose|hate|love|why|how|actually|problem|changed|risk|believe|secret|leak|leaks)$/i;
-  const filler = /^(a|an|and|are|as|at|be|been|but|by|for|from|had|has|have|he|her|hers|him|his|i|if|in|is|it|its|me|my|of|on|or|our|ours|she|so|that|that's|the|their|theirs|them|then|there|these|they|this|those|to|was|we|were|what|when|where|which|who|with|you|your|yours)$/i;
   for (let index = 0; index < chunks.length; index++) {
     const wordsInChunk = chunks[index];
     const next = chunks[index + 1];
@@ -190,27 +188,26 @@ function buildAss(words, start, end) {
     const eventEnd = Math.min(end - start, next ? next[0].start - start : wordsInChunk[wordsInChunk.length - 1].end - start + 0.35);
     if (eventEnd <= eventStart) continue;
 
-    let accentIndex = wordsInChunk.findIndex((word) => emphasis.test(word.word.replace(/[^0-9A-Za-z]/g, "")));
-    if (accentIndex < 0) {
-      const candidates = wordsInChunk
-        .map((word, wordIndex) => ({ wordIndex, token: word.word.replace(/[^0-9A-Za-z']/g, "") }))
-        .filter(({ token }) => token.length >= 4 && !filler.test(token));
-      accentIndex = candidates.length
-        ? candidates.reduce((best, item) => item.token.length > best.token.length ? item : best).wordIndex
-        : -1;
+    // Keep the phrase fixed and emit one timing event per spoken word. Only the
+    // active word changes to electric cyan, so the eye gets karaoke guidance
+    // without the layout flashing, scaling, or bouncing.
+    for (let activeIndex = 0; activeIndex < wordsInChunk.length; activeIndex++) {
+      const active = wordsInChunk[activeIndex];
+      const following = wordsInChunk[activeIndex + 1];
+      const wordStart = Math.max(eventStart, active.start - start);
+      const wordEnd = Math.min(eventEnd, following ? following.start - start : eventEnd);
+      if (wordEnd <= wordStart) continue;
+
+      const rendered = wordsInChunk.map((word, wordIndex) => {
+        let token = word.word.replace(/[{}\\]/g, "");
+        if (wordIndex === 0) token = token.charAt(0).toUpperCase() + token.slice(1);
+        return wordIndex === activeIndex ? `{\\c&H00FFE76E&}${token}{\\c&H00F7F7F7&}` : token;
+      });
+      const charTotal = rendered.reduce((total, token) => total + token.replace(/{[^}]+}/g, "").length, 0) + rendered.length - 1;
+      if (rendered.length >= 4 && charTotal > 19) rendered.splice(Math.ceil(rendered.length / 2), 0, "\\N");
+      const text = rendered.join(" ").replace(/ \\N /g, "\\N");
+      header.push(`Dialogue: 1,${assTime(wordStart)},${assTime(wordEnd)},Cap,,0,0,0,,{\\an5\\pos(540,1375)}${text}`);
     }
-    const rendered = wordsInChunk.map((word, wordIndex) => {
-      let token = word.word.replace(/[{}\\]/g, "");
-      if (wordIndex === 0) token = token.charAt(0).toUpperCase() + token.slice(1);
-      return wordIndex === accentIndex ? `{\\c&H00D7FF&}${token}{\\c&HFFFFFF&}` : token;
-    });
-    const charTotal = rendered.reduce((total, token) => total + token.replace(/{[^}]+}/g, "").length, 0) + rendered.length - 1;
-    if (rendered.length >= 4 && charTotal > 19) {
-      const split = Math.ceil(rendered.length / 2);
-      rendered.splice(split, 0, "\\N");
-    }
-    const text = rendered.join(" ").replace(/ \\N /g, "\\N");
-    header.push(`Dialogue: 1,${assTime(eventStart)},${assTime(eventEnd)},Cap,,0,0,0,,{\\an5\\pos(540,1375)\\fad(80,80)}${text}`);
   }
   return `${header.join("\n")}\n`;
 }

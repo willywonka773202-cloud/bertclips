@@ -107,7 +107,7 @@ function hasAlnum(s: string): boolean {
   return /[0-9a-z]/i.test(s);
 }
 
-/** Build compact, position-locked phrase captions with one optional emphasis word. */
+/** Build compact phrase captions whose active word follows the speech timing. */
 function buildAss(
   words: Word[],
   clipStart: number,
@@ -116,10 +116,10 @@ function buildAss(
   dims: { w: number; h: number },
 ): string {
   const durTotal = clipEnd - clipStart;
-  const capSize = Math.round(dims.h * 0.04);
-  const capOutline = Math.max(3, Math.round(dims.h * 0.0031));
-  const capShadow = Math.max(1, Math.round(dims.h * 0.001));
-  const lock = `{\\an5\\pos(${Math.round(dims.w / 2)},${Math.round(dims.h * 0.716)})\\fad(80,80)}`;
+  const capSize = Math.round(dims.h * 0.0375);
+  const capOutline = Math.max(3, Math.round(dims.h * 0.0021));
+  const capShadow = Math.max(1, Math.round(dims.h * 0.0006));
+  const lock = `{\\an5\\pos(${Math.round(dims.w / 2)},${Math.round(dims.h * 0.716)})}`;
 
   const header = [
     "[Script Info]",
@@ -131,7 +131,7 @@ function buildAss(
     "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    `Style: Cap,${font},${capSize},&H00FFFFFF,&H00FFFFFF,&H00000000,&H70000000,-1,0,0,0,100,100,0,0,1,${capOutline},${capShadow},5,120,120,60,1`,
+    `Style: Cap,${font},${capSize},&H00F7F7F7,&H00F7F7F7,&H00120C08,&H68000000,-1,0,0,0,100,100,0,0,1,${capOutline},${capShadow},5,120,120,60,1`,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
@@ -158,8 +158,6 @@ function buildAss(
     else chunks.push(chunk);
   }
 
-  const emphasis = /^(never|always|best|worst|crazy|insane|truth|mistake|money|million|win|lose|hate|love|why|how|actually|problem|changed|risk|believe|secret|leak|leaks)$/i;
-  const filler = /^(a|an|and|are|as|at|be|been|but|by|for|from|had|has|have|he|her|hers|him|his|i|if|in|is|it|its|me|my|of|on|or|our|ours|she|so|that|that's|the|their|theirs|them|then|there|these|they|this|those|to|was|we|were|what|when|where|which|who|with|you|your|yours)$/i;
   for (let k = 0; k < chunks.length; k++) {
     const wordsInChunk = chunks[k]!;
     const next = chunks[k + 1];
@@ -168,24 +166,23 @@ function buildAss(
     const e = Math.min(durTotal, next ? next[0]!.start - clipStart : last.end - clipStart + 0.35);
     if (e <= s) continue;
 
-    let accent = wordsInChunk.findIndex((word) => emphasis.test(word.word.replace(/[^0-9A-Za-z]/g, "")));
-    if (accent < 0) {
-      const candidates = wordsInChunk
-        .map((word, index) => ({ index, token: word.word.replace(/[^0-9A-Za-z']/g, "") }))
-        .filter(({ token }) => token.length >= 4 && !filler.test(token));
-      accent = candidates.length
-        ? candidates.reduce((best, item) => item.token.length > best.token.length ? item : best).index
-        : -1;
+    for (let activeIndex = 0; activeIndex < wordsInChunk.length; activeIndex++) {
+      const active = wordsInChunk[activeIndex]!;
+      const following = wordsInChunk[activeIndex + 1];
+      const wordStart = Math.max(s, active.start - clipStart);
+      const wordEnd = Math.min(e, following ? following.start - clipStart : e);
+      if (wordEnd <= wordStart) continue;
+
+      const rendered = wordsInChunk.map((word, index) => {
+        let token = sanitizeCaption(word.word);
+        if (index === 0) token = token.charAt(0).toUpperCase() + token.slice(1);
+        return index === activeIndex ? `{\\c&H00FFE76E&}${token}{\\c&H00F7F7F7&}` : token;
+      });
+      const characters = rendered.reduce((total, token) => total + token.replace(/{[^}]+}/g, "").length, 0) + rendered.length - 1;
+      if (rendered.length >= 4 && characters > 19) rendered.splice(Math.ceil(rendered.length / 2), 0, "\\N");
+      const text = rendered.join(" ").replace(/ \\N /g, "\\N");
+      events.push(`Dialogue: 1,${assTime(wordStart)},${assTime(wordEnd)},Cap,,0,0,0,,${lock}${text}`);
     }
-    const rendered = wordsInChunk.map((word, index) => {
-      let token = sanitizeCaption(word.word);
-      if (index === 0) token = token.charAt(0).toUpperCase() + token.slice(1);
-      return index === accent ? `{\\c&H00D7FF&}${token}{\\c&HFFFFFF&}` : token;
-    });
-    const characters = rendered.reduce((total, token) => total + token.replace(/{[^}]+}/g, "").length, 0) + rendered.length - 1;
-    if (rendered.length >= 4 && characters > 19) rendered.splice(Math.ceil(rendered.length / 2), 0, "\\N");
-    const text = rendered.join(" ").replace(/ \\N /g, "\\N");
-    events.push(`Dialogue: 1,${assTime(s)},${assTime(e)},Cap,,0,0,0,,${lock}${text}`);
   }
 
   return `${header}\n${events.join("\n")}\n`;
