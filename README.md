@@ -1,3 +1,13 @@
+# Bert Clips
+
+Experimental clipping and creative-workflow service. The repository contains local-engine and provider integrations; it is not a turnkey hosted service or a claim of publishing revenue. Configure credentials privately and review authentication before exposing a deployment.
+
+[Personal portfolio](https://will-lambert-portfolio.vercel.app) · [Project updates](https://will-lambert-portfolio.vercel.app/updates.html)
+
+---
+
+## Existing technical documentation
+
 # bertclips
 
 The BERT clipping operation as its own standalone, VPS-deployable service — extracted
